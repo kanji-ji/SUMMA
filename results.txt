@@ -1,0 +1,12 @@
+N  = 1088 
+Mat-Mat time  = 2.829113 [sec.] 
+ 910.471564 [MFLOPS] 
+ OK! 
+N  = 1088 
+Mat-Mat time  = 0.569394 [sec.] 
+ 4523.805164 [MFLOPS] 
+ OK! 
+N  = 1088 
+Mat-Mat time  = 0.282819 [sec.] 
+ 9107.685999 [MFLOPS] 
+ OK! 
