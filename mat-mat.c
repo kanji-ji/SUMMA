@@ -37,8 +37,8 @@ int main(int argc, char* argv[]) {
     int num_block=sqrt(numprocs);
 
     if(num_block*num_block!=numprocs){ //confirm numprocs is a square number
-    printf("ERROR: number of processors is not a square number\n");
-    MPI_Abort(MPI_COMM_WORLD,1);    
+        printf("ERROR: number of processors is not a square number\n");
+        MPI_Abort(MPI_COMM_WORLD,1);    
     }
 
     int ndims=2; //because it's matrix
@@ -49,8 +49,8 @@ int main(int argc, char* argv[]) {
 
     int subn=N/num_block; //get the size of submatrix
     if(subn*num_block!=N){
-    printf("ERROR: N have to be dividable by num_block\n");
-    MPI_Abort(MPI_COMM_WORLD,1);
+        printf("ERROR: N have to be dividable by num_block\n");
+        MPI_Abort(MPI_COMM_WORLD,1);
     }
     
     /* getting the index of block matrix*/
@@ -97,12 +97,14 @@ int main(int argc, char* argv[]) {
         /* Verification routine ----------------- */
         iflag = 0;
         for(i=0; i<subn; i++) { 
+            
             for(j=0; j<subn; j++) { 
-            if (fabs(C[i*subn+j] - (double)N) > EPS && myid==0) {
-                printf(" Error! in ( %d , %d ) th argument. Expected value:%d Calculated value:%d\n",i, j, N, C[i*subn+j]);
-                iflag = 1;
-                MPI_Abort(MPI_COMM_WORLD,1);
-            } 
+            
+                if (fabs(C[i*subn+j] - (double)N) > EPS && myid==0) {
+                    printf(" Error! in ( %d , %d ) th argument. Expected value:%d Calculated value:%d\n",i, j, N, C[i*subn+j]);
+                    iflag = 1;
+                    MPI_Abort(MPI_COMM_WORLD,1);
+                } 
             }
         }
         /* ------------------------------------- */
