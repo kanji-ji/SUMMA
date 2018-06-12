@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-
 #include <mpi.h>
 
 #define  N      5440 
@@ -36,29 +35,26 @@ int main(int argc, char* argv[]) {
     /* making a new communicator in order to communicate between blocks*/
     int num_block=sqrt(numprocs);
 
-    if(num_block*num_block!=numprocs){ //confirm numprocs is a square number
-        printf("ERROR: number of processors is not a square number\n");
+    if(num_block*num_block!=numprocs){
+        printf("ERROR: number of processors is not square number\n");
         MPI_Abort(MPI_COMM_WORLD,1);    
     }
 
     int ndims=2; //because it's matrix
-    const int dims[2]={num_block,num_block}; //designate the shape of block matrix
+    const int dims[2]={num_block,num_block};
     const int periods[2]={0,0};
     int reorder=0;
-    MPI_Cart_create(MPI_COMM_WORLD,ndims,dims,periods,reorder,&comm_cart); //create new communicator
+    MPI_Cart_create(MPI_COMM_WORLD,2,dims,periods,reorder,&comm_cart);
 
-    int subn=N/num_block; //get the size of submatrix
+    int subn=N/num_block;
     if(subn*num_block!=N){
         printf("ERROR: N have to be dividable by num_block\n");
-        MPI_Abort(MPI_COMM_WORLD,1);
+        MPI_Abort(MPI_COMM_WORLD,1);   
     }
-    
-    /* getting the index of block matrix*/
     int coords[2];
     MPI_Cart_coords(comm_cart,myid,2,coords);
     int ib_start_row=num_block*coords[0];
     int ib_start_col=num_block*coords[1];
-
     /* matrix memory allocation -------------------*/
     double *A=NULL,*B=NULL,*C=NULL;
     A=(double *) calloc(subn*subn,sizeof(double));
@@ -66,16 +62,19 @@ int main(int argc, char* argv[]) {
     C=(double *) calloc(subn*subn,sizeof(double));
 
     /* matrix generation --------------------------*/
+    //read_matrix(A,filename,comm_cart);
     init_matrix(A,subn);
     init_matrix(B,subn);
     memset(C,0,subn*subn*sizeof(double));
+
     /* end of matrix generation --------------------------*/
 
     /* Start of mat-vec routine ----------------------------*/
     ierr = MPI_Barrier(MPI_COMM_WORLD);
     t1 = MPI_Wtime();
 
-    C=SUMMA(comm_cart,C, A, B, subn);
+    C=SUMMA(comm_cart,C, A, A, subn);
+
 
     t2 = MPI_Wtime();
     t0 =  t2 - t1; 
@@ -84,35 +83,34 @@ int main(int argc, char* argv[]) {
 
     if (myid == 0) {
 
-    printf("N  = %d \n",N);
-    printf("Mat-Mat time  = %lf [sec.] \n",t_w);
-
-    d_mflops = 2.0*(double)N*(double)N*(double)N/t_w;
-    d_mflops = d_mflops * 1.0e-6;
-    printf(" %lf [MFLOPS] \n", d_mflops);
+        printf("N  = %d \n",N);
+        printf("Mat-Mat time  = %lf [sec.] \n",t_w);
+        d_mflops = 2.0*(double)N*(double)N*(double)N/t_w;
+        d_mflops = d_mflops * 1.0e-6;
+        printf(" %lf [MFLOPS] \n", d_mflops);
     }
-
 
     if (DEBUG == 1) {
         /* Verification routine ----------------- */
         iflag = 0;
         for(i=0; i<subn; i++) { 
-            
             for(j=0; j<subn; j++) { 
-            
                 if (fabs(C[i*subn+j] - (double)N) > EPS && myid==0) {
                     printf(" Error! in ( %d , %d ) th argument. Expected value:%d Calculated value:%d\n",i, j, N, C[i*subn+j]);
-                    iflag = 1;
-                    MPI_Abort(MPI_COMM_WORLD,1);
-                } 
-            }
+                printf("final C is ");
+                print_matrix(C,subn);
+                iflag = 1;
+                MPI_Abort(MPI_COMM_WORLD,1);
+            } 
         }
-        /* ------------------------------------- */
+    }
+    /* ------------------------------------- */
 
-        MPI_Reduce(&iflag, &iflag_t, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-        if (myid == 0) {
-            if (iflag_t == 0) printf(" OK! \n");
-        }
+    MPI_Reduce(&iflag, &iflag_t, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    if (myid == 0) {
+        if (iflag_t == 0) printf(" OK! \n");
+    }
+
     }
 
     ierr = MPI_Finalize();
@@ -120,15 +118,13 @@ int main(int argc, char* argv[]) {
     exit(0);
 }
 
-
-//if DEBUG=1 fill A,B with 1.0, else fill them with random numbers
 void init_matrix(double* A,int n){
     double dc_inv;
     int i,j;
     if (DEBUG == 1) {
         for(i=0; i<n; i++) {
             for(j=0; j<n; j++) {
-                A[i*n+j] = 1.0; //using 1D array as 2D array
+                A[i*n+j] = 1.0;
             }
         }
     }
@@ -143,7 +139,6 @@ void init_matrix(double* A,int n){
     }
 }
 
-//unrecommended. file format is complicated
 void read_matrix(double* A,char* filename,MPI_Comm comm_cart){
     int coords[2];
     MPI_Cart_coords(comm_cart,myid,2,coords);
@@ -176,11 +171,10 @@ void read_matrix(double* A,char* filename,MPI_Comm comm_cart){
         fclose(fp);
 }
 
-//normal matrix multiplication
 void MyMatMat(double* C, double* A, double* B, int n) 
 {
      int  i, j, k;
-#pragma omp parallel for private(j,k)
+
      for(i=0; i<n; i++) {
        for(j=0; j<n; j++) {
            C[i*n+j] =0.0;
@@ -206,14 +200,12 @@ double* plus_matrix(double* A,double* B,int n){
 
 double* SUMMA(MPI_Comm comm_cart,double* C, double* A, double* B, int n){
     
-    /*getting the index of block matrix*/
     int coords[2];
     MPI_Cart_coords(comm_cart,myid,2,coords);
     int my_row=coords[0],my_col=coords[1];
     
     int num_block=sqrt(numprocs);
     
-    /*creating new communicators to broadcast A_ij/B_ij along rows/columns*/
     MPI_Comm row_comm,col_comm;
     
     int remain_dims[2];
@@ -224,7 +216,6 @@ double* SUMMA(MPI_Comm comm_cart,double* C, double* A, double* B, int n){
     remain_dims[0]=0; remain_dims[1]=1;
     MPI_Cart_sub(comm_cart,remain_dims,&col_comm);
 
-    /*save A_ij,B_ij to avoid being overwritten by broadcasting*/
     double *A_loc_save=(double *) calloc(n*n,sizeof(double));
     double *B_loc_save=(double *) calloc(n*n,sizeof(double));
     double *C_loc_tmp =(double *) calloc(n*n,sizeof(double));
@@ -233,8 +224,6 @@ double* SUMMA(MPI_Comm comm_cart,double* C, double* A, double* B, int n){
     memcpy(B_loc_save,B,n*n*sizeof(double));
     memset(C_loc_tmp,0,n*n*sizeof(double));
 
-    
-    /*SUMMA main part*/
     int bcast_root,i,j;
     for(bcast_root=0;bcast_root<num_block;++bcast_root){
         
@@ -261,14 +250,12 @@ double* SUMMA(MPI_Comm comm_cart,double* C, double* A, double* B, int n){
     return C;
 }
 
-//for debugging
 void print_matrix(double* A,int n){
     int i;
     for(i=0;i<n*n;++i) printf("%lf ",A[i]);
     printf("\n");
 }
 
-//under construction
 void Strassen(double* C_sub,double* A_sub, double* B_sub,int n){
         
 }
