@@ -46,15 +46,18 @@ int main(int argc, char* argv[]) {
     int reorder=0;
     MPI_Cart_create(MPI_COMM_WORLD,2,dims,periods,reorder,&comm_cart);
 
-    int subn=N/num_block;
+    int subn=N/num_block; //get the size of submatrix
     if(subn*num_block!=N){
         printf("ERROR: N have to be dividable by num_block\n");
         MPI_Abort(MPI_COMM_WORLD,1);   
     }
+
     int coords[2];
     MPI_Cart_coords(comm_cart,myid,2,coords);
+    
     int ib_start_row=num_block*coords[0];
     int ib_start_col=num_block*coords[1];
+    
     /* matrix memory allocation -------------------*/
     double *A=NULL,*B=NULL,*C=NULL;
     A=(double *) calloc(subn*subn,sizeof(double));
@@ -118,6 +121,7 @@ int main(int argc, char* argv[]) {
     exit(0);
 }
 
+//if DEBUG=true, fill A with 1.0, and with random numbers otherwise.
 void init_matrix(double* A,int n){
     double dc_inv;
     int i,j;
@@ -139,6 +143,7 @@ void init_matrix(double* A,int n){
     }
 }
 
+//unrecommended. file format is complicated
 void read_matrix(double* A,char* filename,MPI_Comm comm_cart){
     int coords[2];
     MPI_Cart_coords(comm_cart,myid,2,coords);
@@ -171,6 +176,7 @@ void read_matrix(double* A,char* filename,MPI_Comm comm_cart){
         fclose(fp);
 }
 
+//pure matrix multiplication
 void MyMatMat(double* C, double* A, double* B, int n) 
 {
      int  i, j, k;
@@ -206,6 +212,7 @@ double* SUMMA(MPI_Comm comm_cart,double* C, double* A, double* B, int n){
     
     int num_block=sqrt(numprocs);
     
+    /* create new communicators to broadcast A,B alog rows and columns-----*/
     MPI_Comm row_comm,col_comm;
     
     int remain_dims[2];
@@ -224,6 +231,7 @@ double* SUMMA(MPI_Comm comm_cart,double* C, double* A, double* B, int n){
     memcpy(B_loc_save,B,n*n*sizeof(double));
     memset(C_loc_tmp,0,n*n*sizeof(double));
 
+    /* main multiplication part-------------------------------*/
     int bcast_root,i,j;
     for(bcast_root=0;bcast_root<num_block;++bcast_root){
         
@@ -250,12 +258,14 @@ double* SUMMA(MPI_Comm comm_cart,double* C, double* A, double* B, int n){
     return C;
 }
 
+/* debugger---------------------------------*/
 void print_matrix(double* A,int n){
     int i;
     for(i=0;i<n*n;++i) printf("%lf ",A[i]);
     printf("\n");
 }
 
+/*under construction-------------------*/
 void Strassen(double* C_sub,double* A_sub, double* B_sub,int n){
         
 }
